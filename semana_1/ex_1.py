@@ -10,7 +10,7 @@ import random
 import numpy as np
 
 lista_exemplo = [7, 3, 1, 4, 5]
-reverse = lista_exemplo[:]
+reverse = lista_exemplo.copy()
 reverse.sort(reverse=True)
 
 while not lista_exemplo == reverse:
