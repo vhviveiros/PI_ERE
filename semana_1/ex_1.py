@@ -7,7 +7,6 @@
 # OBS: Faça a ordenação ser decrescente (começa do maior valor e termina no menor valor)
 
 import random
-import numpy as np
 
 lista_exemplo = [7, 3, 1, 4, 5]
 reverse = lista_exemplo.copy()

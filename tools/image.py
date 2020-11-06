@@ -8,7 +8,8 @@ import mahotas as mt
 
 
 class Image:
-    def __init__(self, image_file=None, data=None, divide=False, reshape=False):
+    def __init__(self, image_file=None, data=None, divide=False, reshape=False, target_size=None):
+        self.target_size = target_size
         self.divide = divide
         self.reshape = reshape
 
@@ -18,12 +19,13 @@ class Image:
 
         if data is not None:
             self.data = data
+            if self.target_size:
+                self.data = cv2.resize(self.data, self.target_size)
 
-    def __load_file(self, target_size=(512, 512), flag=None):
+    def __load_file(self, flag=None):
         img = cv2.imread(self.image_file, flag)
         if self.divide:
             img = img / 255
-        img = cv2.resize(img, target_size)
         if self.reshape:
             img = np.reshape(img, img.shape + (1,))
             img = np.reshape(img, (1,) + img.shape)
@@ -85,6 +87,26 @@ class Image:
     def get_channel(self, channel):
         return self.data[:, :, channel]
 
+    def bgr2rgb(self):
+        self.data = cv2.cvtColor(self.data, cv2.COLOR_BGR2RGB)
+        return self
+
+    def bgr2hsv(self):
+        self.data = cv2.cvtColor(self.data, cv2.COLOR_BGR2HSV)
+        return self
+
+    def rgb2hsv(self):
+        self.data = cv2.cvtColor(self.data, cv2.COLOR_RGB2HSV)
+        return self
+
+    def hsv2rgb(self):
+        self.data = cv2.cvtColor(self.data, cv2.COLOR_HSV2RGB)
+        return self
+
+    def hsv2bgr(self):
+        self.data = cv2.cvtColor(self.data, cv2.COLOR_HSV2BGR)
+        return self
+
 
 class ImageGenerator:
     def generate_from(self, path, divide=False, reshape=False, only_data=False):
@@ -116,13 +138,16 @@ class ImageEditor:
 
     def crop(self, x, y, w, h):
         return Image(data=self.img.data[y:y+h, x:x+w].copy())
-        return self
 
     def paste(self, img: Image, x, y):
-        shape = img.data.shape
-        shape_h = shape[0]
-        shape_w = shape[1]
+        shape_h, shape_w, _ = img.data.shape
         self.img.data[y:y+shape_h, x:x+shape_w] = img.data
+        return self
+
+    def blend(self, img: Image, x, y, alpha):
+        rows, cols, channels = img.data.shape
+        overlay = cv2.addWeighted(self.img.data[y:y + rows, x:x + cols], 1-alpha, img.data, alpha, 0)
+        self.paste(Image(data=overlay), x, y)
         return self
 
     def swap_channels(self, channel1, channel2, where):

@@ -6,9 +6,9 @@ from tools.utils import real_path
 import cv2
 
 bozo = Image(real_path(__file__, 'bozo.png'))
-l_h, l_w, _ = bozo.shape()
+b_h, b_w, _ = bozo.shape()
 
-lula = Image(real_path(__file__, 'lula.png')).resize((l_h, l_w))
+lula = Image(real_path(__file__, 'lula.png')).resize((b_h, b_w))
 
 
 def where(pixel):
