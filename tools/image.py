@@ -19,8 +19,9 @@ class Image:
 
         if data is not None:
             self.data = data
-            if self.target_size:
-                self.data = cv2.resize(self.data, self.target_size)
+
+        if self.data is not None and self.target_size is not None:
+            self.data = cv2.resize(self.data, self.target_size)
 
     def __load_file(self, flag=None):
         img = cv2.imread(self.image_file, flag)
