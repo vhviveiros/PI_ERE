@@ -1,10 +1,11 @@
-import cv2
+import cv2.cv2 as cv2
 import numpy as np
 import os
 from .utils import abs_path
 from glob import glob
 from matplotlib import pyplot as plt
 import mahotas as mt
+import time
 
 
 class Image:
@@ -108,6 +109,14 @@ class Image:
         self.data = cv2.cvtColor(self.data, cv2.COLOR_HSV2BGR)
         return self
 
+    def bgr2gray(self):
+        self.data = cv2.cvtColor(self.data, cv2.COLOR_BGR2GRAY)
+        return self
+
+    def gray2bgr(self):
+        self.data = cv2.cvtColor(self.data, cv2.COLOR_GRAY2BGR)
+        return self
+
 
 class ImageGenerator:
     def generate_from(self, path, divide=False, reshape=False, only_data=False):
@@ -138,16 +147,16 @@ class ImageEditor:
         return self
 
     def crop(self, x, y, w, h):
-        return Image(data=self.img.data[y:y+h, x:x+w].copy())
+        return Image(data=self.img.data[y:y + h, x:x + w].copy())
 
     def paste(self, img: Image, x, y):
         shape_h, shape_w, _ = img.data.shape
-        self.img.data[y:y+shape_h, x:x+shape_w] = img.data
+        self.img.data[y:y + shape_h, x:x + shape_w] = img.data
         return self
 
     def blend(self, img: Image, x, y, alpha):
         rows, cols, channels = img.data.shape
-        overlay = cv2.addWeighted(self.img.data[y:y + rows, x:x + cols], 1-alpha, img.data, alpha, 0)
+        overlay = cv2.addWeighted(self.img.data[y:y + rows, x:x + cols], 1 - alpha, img.data, alpha, 0)
         self.paste(Image(data=overlay), x, y)
         return self
 
@@ -181,3 +190,80 @@ class ImageEditor:
             for j in range(0, len(self.img.data[i])):
                 if where(self.img.data[i][j]):
                     self.img.data[i][j] = [0, 0, 0]
+
+
+class ImageLimiarizator:
+    min_lim = 0
+    max_lim = 255
+
+    max_adapt = 255
+    block_size = 11
+    block_sizes = [3, 7, 9, 11]
+    c_value = 100
+
+    img_limiar = None
+    img_adaptive_limiar = None
+
+    def __init__(self, img: Image, title=''):
+        self.img = img
+        self.title = title
+        self.limiar = img
+        cv2.namedWindow(title)
+
+    def with_limiarization_controls(self, opt=cv2.THRESH_BINARY):
+        self.img_limiar = self.img
+
+        def on_change_lim(min_lim, max_lim):
+            self.min_lim = min_lim
+            self.max_lim = max_lim
+            limiar, img_limiar = cv2.threshold(self.img.data, min_lim, max_lim, opt)
+            self.limiar = Image(data=limiar)
+            self.img_limiar = Image(data=img_limiar)
+            time.sleep(0.05)  # Prevents crashing
+            self.show()
+
+        def on_change_min(lim):
+            on_change_lim(lim, self.max_lim)
+
+        def on_change_max(lim):
+            on_change_lim(self.min_lim, lim)
+
+        cv2.createTrackbar('Mínimo Limiarização', self.title, self.min_lim, self.max_lim, on_change_min)
+        cv2.createTrackbar('Máximo Limiarização', self.title, self.max_lim, self.max_lim, on_change_max)
+        return self
+
+    def with_adaptive_limiarization_controls(self, method=cv2.ADAPTIVE_THRESH_MEAN_C, opt=cv2.THRESH_BINARY):
+        self.img_adaptive_limiar = self.img
+
+        def on_change(max_adapt, block_size, c):
+            self.max_adapt = max_adapt
+            adapt = cv2.adaptiveThreshold(self.img.data, self.max_adapt, method, opt, block_size, c)
+            self.img_adaptive_limiar = Image(data=adapt)
+            time.sleep(0.05)
+            self.show()
+
+        def on_change_block_size(pos):
+            on_change(self.max_adapt, self.block_sizes[pos], self.c_value)
+
+        def on_change_max_value(value):
+            on_change(value, self.block_size, self.c_value)
+
+        def on_change_c_value(c):
+            on_change(self.max_adapt, self.block_size, c)
+
+        cv2.createTrackbar('Tamanho de bloco', self.title, 0, 3, on_change_block_size)
+        cv2.createTrackbar('Valor máximo', self.title, 0, self.max_adapt, on_change_max_value)
+        cv2.createTrackbar('Valor constante', self.title, 0, self.c_value, on_change_c_value)
+
+        return self
+
+    def show(self):
+        cv2.imshow("Original", self.img.data)
+        if self.img_limiar:
+            cv2.imshow(self.title, self.img_limiar.data)
+
+        if self.img_adaptive_limiar:
+            cv2.imshow(self.title, self.img_adaptive_limiar.data)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        return self
