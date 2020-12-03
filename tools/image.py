@@ -1,22 +1,26 @@
+from __future__ import annotations
 import cv2.cv2 as cv2
 import numpy as np
 import os
 from .utils import abs_path
 from glob import glob
-from matplotlib import pyplot as plt
+import matplotlib
+import matplotlib.pyplot as plt
 import mahotas as mt
 import time
 
+matplotlib.use('TkAgg')
+
 
 class Image:
-    def __init__(self, image_file=None, data=None, divide=False, reshape=False, target_size=None):
+    def __init__(self, image_file=None, data=None, divide=False, reshape=False, target_size=None, flag=None):
         self.target_size = target_size
         self.divide = divide
         self.reshape = reshape
 
         if image_file is not None:
             self.image_file = image_file
-            self.data = self.__load_file()
+            self.data = self.__load_file(flag)
 
         if data is not None:
             self.data = data
@@ -24,7 +28,7 @@ class Image:
         if self.data is not None and self.target_size is not None:
             self.data = cv2.resize(self.data, self.target_size)
 
-    def __load_file(self, flag=None):
+    def __load_file(self, flag):
         img = cv2.imread(self.image_file, flag)
         if self.divide:
             img = img / 255
@@ -32,6 +36,9 @@ class Image:
             img = np.reshape(img, img.shape + (1,))
             img = np.reshape(img, (1,) + img.shape)
         return img
+
+    def apply(self, function, *args):
+        return function(self.data, *args)
 
     def show(self, text='image'):
         cv2.imshow(text, self.data)
@@ -81,6 +88,10 @@ class Image:
         ht_mean = textures.mean(axis=0)
         return ht_mean
 
+    def invert(self):
+        self.data = cv2.bitwise_not(self.data)
+        return self
+
     def greatest_rgb_channel(self):
         b, g, r = cv2.split(self.data)
         sum = {np.sum(r): "Vermelho", np.sum(g): "Verde", np.sum(b): "Azul"}
@@ -91,6 +102,10 @@ class Image:
 
     def bgr2rgb(self):
         self.data = cv2.cvtColor(self.data, cv2.COLOR_BGR2RGB)
+        return self
+
+    def rgb2bgr(self):
+        self.data = cv2.cvtColor(self.data, cv2.COLOR_RGB2BGR)
         return self
 
     def bgr2hsv(self):
@@ -267,3 +282,47 @@ class ImageLimiarizator:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
         return self
+
+
+class ImageFilter:
+    def __init__(self, img: Image):
+        self.img = img
+        self.filtered = img
+
+    def __apply(self, f, *args):
+        return self.img.apply(f, *args)
+
+    def averaging(self, k_size=5) -> ImageFilter:
+        self.filtered = Image(data=self.__apply(cv2.blur, (k_size, k_size)))
+        return self
+
+    def gaussian(self, k_size=5, sigmax=0, sigmay=None) -> ImageFilter:
+        self.filtered = Image(data=self.__apply(cv2.GaussianBlur, (k_size, k_size), sigmax, None, sigmay))
+        return self
+
+    def median(self, k_size=5) -> ImageFilter:
+        self.filtered = Image(data=self.__apply(cv2.medianBlur, k_size))
+        return self
+
+    def sobel(self, dx, dy, k_size=5, ddepth=cv2.CV_8U) -> ImageFilter:
+        self.filtered = Image(data=self.__apply(cv2.Sobel, ddepth, dx, dy, None, k_size))
+        return self
+
+    def laplacian(self, ddepth=cv2.CV_64F, k_size=None) -> ImageFilter:
+        self.filtered = Image(data=self.__apply(cv2.Laplacian, ddepth, None, k_size))
+        return self
+
+
+class Subplot:
+    def __init__(self, images, ncols, nrows):
+        assert ncols * nrows == len(images)
+        self.ncols = ncols
+        self.nrows = nrows
+        self.images = images
+
+    def show(self):
+        for i in range(0, len(self.images)):
+            img = self.images[i]
+            if img:
+                plt.subplot(self.nrows, self.ncols, i + 1), plt.imshow(img.data, 'gray')
+        plt.show()
