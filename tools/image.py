@@ -62,24 +62,6 @@ class Image:
         cv2.resize(self.data, size)
         return self
 
-    def hist(self):
-        result = np.squeeze(cv2.calcHist(
-            [self.data], [0], None, [255], [1, 256]))
-        result = np.asarray(result, dtype='int32')
-        return result
-
-    def save_hist(self, save_folder=''):
-        plt.figure()
-        histg = cv2.calcHist([self.data], [0], None, [254], [
-            1, 255])  # calculating histogram
-        plt.plot(histg)
-        filename, fileext = self.get_file_dir()
-        result_file = abs_path(
-            save_folder, "%s_histogram%s" % (filename, '.png'))
-        plt.savefig(result_file)
-        plt.close()
-        return self
-
     def haralick(self):
         # calculate haralick texture features for 4 types of adjacency
         textures = mt.features.haralick(self.data)
@@ -90,6 +72,10 @@ class Image:
 
     def invert(self):
         self.data = cv2.bitwise_not(self.data)
+        return self
+
+    def equalize(self):
+        self.data = cv2.equalizeHist(self.data)
         return self
 
     def greatest_rgb_channel(self):
@@ -131,6 +117,9 @@ class Image:
     def gray2bgr(self):
         self.data = cv2.cvtColor(self.data, cv2.COLOR_GRAY2BGR)
         return self
+
+    def isGrayScale(self):
+        return len(self.data.shape) < 3
 
 
 class ImageGenerator:
@@ -222,7 +211,6 @@ class ImageLimiarizator:
     def __init__(self, img: Image, title=''):
         self.img = img
         self.title = title
-        self.limiar = img
         cv2.namedWindow(title)
 
     def with_limiarization_controls(self, opt=cv2.THRESH_BINARY):
@@ -231,8 +219,7 @@ class ImageLimiarizator:
         def on_change_lim(min_lim, max_lim):
             self.min_lim = min_lim
             self.max_lim = max_lim
-            limiar, img_limiar = cv2.threshold(self.img.data, min_lim, max_lim, opt)
-            self.limiar = Image(data=limiar)
+            _, img_limiar = cv2.threshold(self.img.data, min_lim, max_lim, opt)
             self.img_limiar = Image(data=img_limiar)
             time.sleep(0.05)  # Prevents crashing
             self.show()
@@ -325,4 +312,29 @@ class Subplot:
             img = self.images[i]
             if img:
                 plt.subplot(self.nrows, self.ncols, i + 1), plt.imshow(img.data, 'gray')
+        plt.show()
+
+
+class Histogram:
+    def __init__(self, img: Image):
+        self.img = img
+        self.__calc()
+
+    def __calc(self):
+        color = ['b', 'g', 'r']
+        channels = 1 if self.img.isGrayScale() else 3
+        plt.figure()
+        for i in range(0, channels):
+            hist = np.squeeze(cv2.calcHist([self.img.data], [i], None, [256], [0, 256]))
+            plt.plot(hist, color=color[i])
+
+    def save(self, save_folder=''):
+        filename, fileext = self.img.get_file_dir()
+        result_file = abs_path(
+            save_folder, "%s_histogram%s" % (filename, '.png'))
+        plt.savefig(result_file)
+        plt.close()
+        return self
+
+    def show(self):
         plt.show()
