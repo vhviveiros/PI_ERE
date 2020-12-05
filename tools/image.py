@@ -8,6 +8,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import mahotas as mt
 import time
+from math import sqrt, pow
 
 matplotlib.use('TkAgg')
 
@@ -78,6 +79,16 @@ class Image:
         self.data = cv2.equalizeHist(self.data)
         return self
 
+    def calc_histogram(self):
+        """
+        Only works with BGR
+        """
+        copy = Image(data=self.data)
+        copy.bgr2hsv()
+        hist = cv2.calcHist([copy.data], [0, 1], None, [50, 60], [0, 180, 0, 256], accumulate=False)
+        cv2.normalize(hist, hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+        return hist
+
     def greatest_rgb_channel(self):
         b, g, r = cv2.split(self.data)
         sum = {np.sum(r): "Vermelho", np.sum(g): "Verde", np.sum(b): "Azul"}
@@ -118,18 +129,23 @@ class Image:
         self.data = cv2.cvtColor(self.data, cv2.COLOR_GRAY2BGR)
         return self
 
-    def isGrayScale(self):
+    def is_gray_scale(self):
         return len(self.data.shape) < 3
 
 
 class ImageGenerator:
-    def generate_from(self, path, divide=False, reshape=False, only_data=False):
-        image_files = glob(path + "/*g")
+    @staticmethod
+    def generate_from(path, files=None, divide=False, reshape=False, only_data=False, target_size=(512, 512)):
+        if files:
+            image_files = [path + '/' + file for file in files]
+        else:
+            image_files = glob(path + "/*g")
+
         for image_file in image_files:
             if only_data:
-                yield Image(image_file, divide, reshape).data
+                yield Image(image_file, divide=divide, reshape=reshape, target_size=target_size).data
             else:
-                yield Image(image_file, divide, reshape)
+                yield Image(image_file, divide=divide, reshape=reshape, target_size=target_size)
 
 
 class ImageSaver:
@@ -315,18 +331,17 @@ class Subplot:
         plt.show()
 
 
-class Histogram:
+class HistogramPlot:
     def __init__(self, img: Image):
         self.img = img
         self.__calc()
 
     def __calc(self):
-        color = ['b', 'g', 'r']
-        channels = 1 if self.img.isGrayScale() else 3
+        color = 'b' if self.img.is_gray_scale() else ('b', 'g', 'r')
         plt.figure()
-        for i in range(0, channels):
+        for i, col in enumerate(color):
             hist = np.squeeze(cv2.calcHist([self.img.data], [i], None, [256], [0, 256]))
-            plt.plot(hist, color=color[i])
+            plt.plot(hist, color=col)
 
     def save(self, save_folder=''):
         filename, fileext = self.img.get_file_dir()
@@ -338,3 +353,21 @@ class Histogram:
 
     def show(self):
         plt.show()
+
+
+class ImageSearch:
+    def __init__(self, generator: ImageGenerator.generate_from):
+        self.base = list(generator)
+
+    def search(self, img: Image):
+        result = ()
+
+        for i in self.base:
+            corr = cv2.compareHist(i.calc_histogram(), img.calc_histogram(), cv2.HISTCMP_CORREL)
+            chi = cv2.compareHist(i.calc_histogram(), img.calc_histogram(), cv2.HISTCMP_CHISQR)
+            bhatt = cv2.compareHist(i.calc_histogram(), img.calc_histogram(), cv2.HISTCMP_BHATTACHARYYA)
+
+            file_dir = i.get_file_dir()
+            result += (file_dir[0] + file_dir[1], sqrt(pow(corr, 2) + pow(chi, 2) + pow(bhatt, 2)))
+
+        return result

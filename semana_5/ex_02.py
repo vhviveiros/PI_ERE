@@ -1,4 +1,4 @@
-from tools.image import Image, Histogram
+from tools.image import Image, HistogramPlot
 from tools.utils import abs_path
 import cv2.cv2 as cv2
 
