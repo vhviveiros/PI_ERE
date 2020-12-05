@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import cv2.cv2 as cv2
 import numpy as np
 import os
@@ -9,6 +10,10 @@ import matplotlib.pyplot as plt
 import mahotas as mt
 import time
 from math import sqrt, pow
+from tkinter import *
+from PIL import Image as ImagePil
+from PIL import ImageTk
+import tkinter.filedialog as filedialog
 
 matplotlib.use('TkAgg')
 
@@ -132,6 +137,10 @@ class Image:
     def is_gray_scale(self):
         return len(self.data.shape) < 3
 
+    def count_colors(self):
+        uniques = np.unique(self.data.reshape(-1, self.data.shape[-1]), axis=0)
+        return len(uniques)
+
 
 class ImageGenerator:
     @staticmethod
@@ -168,6 +177,13 @@ class ImageEditor:
 
     def crop(self, x, y, w, h):
         return Image(data=self.img.data[y:y + h, x:x + w].copy())
+
+    def idk_a_proper_name_for_this(self, img: Image, color):
+        for i in range(0, img.data.shape[0]):
+            for j in range(0, img.data.shape[1]):
+                if all(c == color for c in self.img.data[i][j]):
+                    self.img.data[i][j] = img.data[i][j]
+        return self
 
     def paste(self, img: Image, x, y):
         shape_h, shape_w, _ = img.data.shape
@@ -210,6 +226,19 @@ class ImageEditor:
             for j in range(0, len(self.img.data[i])):
                 if where(self.img.data[i][j]):
                     self.img.data[i][j] = [0, 0, 0]
+
+    def compute_k_means(self, k):
+        reshape = self.img.data.reshape(-1, 3)
+        reshape = np.float32(reshape)
+
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 40, 0.1)
+
+        _, labels, centroids = cv2.kmeans(reshape, k, None, criteria, 40, cv2.KMEANS_RANDOM_CENTERS)
+
+        centroids = np.uint8(centroids)
+        img = centroids[labels.flatten()]
+        img = img.reshape(self.img.data.shape)
+        self.img.data = img
 
 
 class ImageLimiarizator:
@@ -371,3 +400,131 @@ class ImageSearch:
             result += (file_dir[0] + file_dir[1], sqrt(pow(corr, 2) + pow(chi, 2) + pow(bhatt, 2)))
 
         return result
+
+
+class GrabCutGUI(Frame):
+    def __init__(self):
+        # invoca o construtor da classe pai Frame
+        Frame.__init__(self, Tk())
+
+        # inicializar a interface gráfica
+        self.iniciaUI()
+
+    def iniciaUI(self):
+        # preparando a janela
+        self.master.title("Janela da Imagem Segmentada")
+        self.pack()
+
+        # computa ações de mouse
+        self.computaAcoesDoMouse()
+
+        # carregando a imagem do disco
+        self.imagem = self.carregaImagemASerExibida()
+
+        self.master.geometry(str(self.imagem.width()) + "x" + str(self.imagem.height()))
+
+        # criar um canvas que receberá a imagem
+        self.canvas = Canvas(self.master, width=self.imagem.width(), height=self.imagem.height(), cursor="cross")
+
+        # desenhar a imagem que carreguei no canvas
+        self.canvas.create_image(0, 0, anchor=NW, image=self.imagem)
+        self.canvas.image = self.imagem  # pra imagem não ser removida pelo garbage collector
+
+        # posiciona todos os elementos no canvas
+        self.canvas.pack()
+
+    def computaAcoesDoMouse(self):
+        self.startX = None
+        self.startY = None
+        self.rect = None
+        self.rectangleReady = None
+
+        self.master.bind("<ButtonPress-1>", self.callbackBotaoPressionado)
+        self.master.bind("<B1-Motion>", self.callbackBotaoPressionadoEmMovimento)
+        self.master.bind("<ButtonRelease-1>", self.callbackBotaoSolto)
+
+    def callbackBotaoSolto(self, event):
+        if self.rectangleReady:
+            # criar uma nova janela
+            windowGrabcut = Toplevel(self.master)
+            windowGrabcut.wm_title("Segmentation")
+            windowGrabcut.minsize(width=self.imagem.width(), height=self.imagem.height())
+
+            # criar canvas pra essa nova janela
+            canvasGrabcut = Canvas(windowGrabcut, width=self.imagem.width(), height=self.imagem.height())
+            canvasGrabcut.pack()
+
+            # aplicar grabcut na imagem
+            mask = np.zeros(self.imagemOpenCV.shape[:2], np.uint8)
+            print(mask.shape)
+            rectGcut = (int(self.startX), int(self.startY), int(event.x - self.startX), int(event.y - self.startY))
+            fundoModel = np.zeros((1, 65), np.float64)
+            objModel = np.zeros((1, 65), np.float64)
+
+            # invocar grabcut
+            cv2.grabCut(self.imagemOpenCV, mask, rectGcut, fundoModel, objModel, 5, cv2.GC_INIT_WITH_RECT)
+
+            # preparando imagem final
+            maskFinal = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8')
+            imgFinal = self.imagemOpenCV * maskFinal[:, :, np.newaxis]
+
+            blurred = self.__blurred_background()
+
+            for x in range(0, self.imagemOpenCV.shape[1]):
+                for y in range(0, self.imagemOpenCV.shape[0]):
+                    if maskFinal[y][x] == 0:
+                        imgFinal[y][x] = blurred[y][x]
+
+            # converter de volta do opencv pra Tkinter
+            imgFinal = cv2.cvtColor(imgFinal, cv2.COLOR_BGR2RGB)
+            imgFinal = ImagePil.fromarray(imgFinal)
+            imgFinal = ImageTk.PhotoImage(imgFinal)
+
+            # inserir a imagem segmentada no canvas
+            canvasGrabcut.create_image(0, 0, anchor=NW, image=imgFinal)
+            canvasGrabcut.image = imgFinal
+
+    def __blurred_background(self):
+        base_filter = ImageFilter(Image(data=self.imagemOpenCV))
+        return base_filter.gaussian(11, 5).filtered.data
+
+    def callbackBotaoPressionadoEmMovimento(self, event):
+        # novas posicoes de x e y
+        currentX = self.canvas.canvasx(event.x)
+        currentY = self.canvas.canvasy(event.y)
+
+        # atualiza o retângulo a ser desenhado
+        self.canvas.coords(self.rect, self.startX, self.startY, currentX, currentY)
+
+        # verifica se existe retângulo desenhado
+        self.rectangleReady = True
+
+    def callbackBotaoPressionado(self, event):
+        # convertendo o x do frame, pro x do canvas e copiando isso em startX
+        self.startX = self.canvas.canvasx(event.x)
+        self.startY = self.canvas.canvasy(event.y)
+
+        if not self.rect:
+            self.rect = self.canvas.create_rectangle(0, 0, 0, 0, outline="blue")
+
+    def carregaImagemASerExibida(self):
+        caminhoDaImagem = filedialog.askopenfilename()
+
+        # se a imagem existir, entra no if
+        if caminhoDaImagem:
+            self.imagemOpenCV = cv2.imread(caminhoDaImagem)
+
+            # converte de opencv para o formato PhotoImage
+            image = cv2.cvtColor(self.imagemOpenCV, cv2.COLOR_BGR2RGB)
+
+            # converte de OpenCV pra PIL
+            image = ImagePil.fromarray(image)
+
+            # converte de PIL pra PhotoImage
+            image = ImageTk.PhotoImage(image)
+
+            return image
+
+    def show(self):
+        self.mainloop()
+        return self
