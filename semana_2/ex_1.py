@@ -3,6 +3,6 @@
 from tools.image import Image, ImageEditor
 from tools.utils import real_path
 
-img = Image(real_path(__file__, 'example.png'))
+img = Image(real_path(__file__, 'semana_2/example.png'))
 editor = ImageEditor(img)
 editor.crop(300, 430, 80, 200).show()

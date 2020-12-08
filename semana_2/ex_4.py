@@ -13,7 +13,7 @@ def where(pixel):
     return False
 
 
-img = Image(real_path(__file__, 'sonic.png'))  # BGR
+img = Image(real_path(__file__, 'semana_2/sonic.png'))  # BGR
 editor = ImageEditor(img)
 editor.swap_channels(0, 1, where)  # GBR
 img.show()

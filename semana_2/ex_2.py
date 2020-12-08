@@ -9,7 +9,7 @@
 from tools.image import Image, ImageEditor
 from tools.utils import real_path
 
-img = Image(real_path(__file__, 'example.png'))
+img = Image(real_path(__file__, 'semana_2/example.png'))
 editor = ImageEditor(img)
 ball = editor.crop(300, 430, 80, 200)
 editor.paste(ball, 40, 418)

@@ -25,5 +25,5 @@ def roi(frame):
     return [['frame', frame.data], ['mask', mask.data]]
 
 
-video = Video(real_path(__file__, 'sasuke.mp4'))
+video = Video(real_path(__file__, 'semana_3/sasuke.mp4'))
 video.apply_and_show(roi)

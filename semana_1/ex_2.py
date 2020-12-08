@@ -2,5 +2,5 @@
 from tools.image import Image
 from tools.utils import real_path
 
-img = Image(real_path(__file__, 'example.jpg'))
+img = Image(real_path(__file__, 'semana_1/example.jpg'))
 img.show()

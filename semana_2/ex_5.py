@@ -5,10 +5,10 @@ from tools.image import Image, ImageEditor
 from tools.utils import real_path
 import cv2
 
-bozo = Image(real_path(__file__, 'bozo.png'))
+bozo = Image(real_path(__file__, 'semana_2/bozo.png'))
 b_h, b_w, _ = bozo.shape()
 
-lula = Image(real_path(__file__, 'lula.png')).resize((b_h, b_w))
+lula = Image(real_path(__file__, 'semana_2/lula.png')).resize((b_h, b_w))
 
 
 def where(pixel):

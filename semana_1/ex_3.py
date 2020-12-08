@@ -5,7 +5,7 @@
 from tools.image import Image, ImageEditor
 from tools.utils import real_path
 
-img = Image(real_path(__file__, 'example2.png'))
+img = Image(real_path(__file__, 'semana_1/example2.png'))
 editor = ImageEditor(img)
 editor.draw_square(20, 20, 80, 80, 0)
 img.show()

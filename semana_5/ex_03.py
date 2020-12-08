@@ -1,9 +1,8 @@
 from tools.image import Image, ImageGenerator, ImageSearch
 from tools.utils import abs_path
 
-pik_imgs = [1, 2, 6]
-search = ImageSearch(ImageGenerator.generate_from(abs_path('')))
-pik = ImageGenerator.generate_from(abs_path(''), files=['pik.png', 'pik2.png', 'pik3.png'])
+search = ImageSearch(ImageGenerator.generate_from(abs_path('semana_5/')))
+pik = ImageGenerator.generate_from(abs_path('semana_5/'), files=['pik.png', 'pik2.png', 'pik3.png'])
 
 for i in pik:
     file_dir = i.get_file_dir()
